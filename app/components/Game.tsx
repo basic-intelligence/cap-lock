@@ -250,18 +250,16 @@ export default function Game({ words }: GameProps) {
         &ldquo;{state.theme}&rdquo;
       </div>
 
-      {/* Word display */}
-      <div style={{ flex: "1 1 auto", display: "flex", alignItems: "center", minHeight: "120px" }}>
+      {/* Word display + alphabet grouped tight */}
+      <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "120px", gap: 0 }}>
         <WordDisplay
           word={state.targetWord}
           revealedSegments={revealed}
           lockedLetters={lockedLetters}
           isVictory={state.phase === "won"}
         />
+        <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
       </div>
-
-      {/* Alphabet reference — directly below the display, above input */}
-      <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
 
       {/* Timer */}
       {isPlaying && <Timer remainingMs={remaining} />}
