@@ -240,13 +240,14 @@ export default function Game({ words }: GameProps) {
       {/* Theme hint */}
       <div
         style={{
-          fontSize: "0.85rem",
-          letterSpacing: "0.2em",
+          fontSize: "1.8rem",
+          letterSpacing: "0.15em",
           textTransform: "uppercase",
-          color: "var(--text-muted)",
+          color: "var(--amber)",
+          fontWeight: "bold",
         }}
       >
-        {state.theme}
+        &ldquo;{state.theme}&rdquo;
       </div>
 
       {/* Word display */}
@@ -259,6 +260,9 @@ export default function Game({ words }: GameProps) {
         />
       </div>
 
+      {/* Alphabet reference — directly below the display, above input */}
+      <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
+
       {/* Timer */}
       {isPlaying && <Timer remainingMs={remaining} />}
 
@@ -270,9 +274,6 @@ export default function Game({ words }: GameProps) {
         error={state.error}
         onClearError={handleClearError}
       />
-
-      {/* Alphabet reference */}
-      <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
 
       {/* Guess history */}
       <GuessHistory guesses={state.guesses} />
