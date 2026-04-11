@@ -11,6 +11,7 @@ import GuessInput from "./GuessInput";
 import GuessHistory from "./GuessHistory";
 import Timer from "./Timer";
 import ResultsScreen from "./ResultsScreen";
+import AlphabetStrip from "./AlphabetStrip";
 
 const ROUND_DURATION_MS = 60_000;
 
@@ -202,6 +203,9 @@ export default function Game({ words }: GameProps) {
         maxHeight: "100dvh",
       }}
     >
+      {/* Alphabet strip */}
+      <AlphabetStrip />
+
       {/* Theme hint */}
       <div
         style={{
