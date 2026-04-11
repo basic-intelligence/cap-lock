@@ -9,6 +9,8 @@ interface SegmentDisplayProps {
   revealedSegments: boolean[];
   displayState: DisplayState;
   size?: number;
+  /** Raise dim segment opacity so outlines are clearly visible (for alphabet reference) */
+  showOutlines?: boolean;
 }
 
 const COLORS = {
@@ -22,6 +24,7 @@ export default function SegmentDisplay({
   revealedSegments,
   displayState,
   size = 100,
+  showOutlines = false,
 }: SegmentDisplayProps) {
   const charCode = CHAR_MAP[char.toUpperCase()] ?? 0;
   const scale = size / 100;
@@ -69,7 +72,7 @@ export default function SegmentDisplay({
             ? (isActive ? COLORS.green : COLORS.dim)
             : (isLit ? COLORS.amber : COLORS.dim);
 
-          const opacity = isLit ? 1 : 0.08;
+          const opacity = isLit ? 1 : showOutlines ? 0.18 : 0.08;
 
           return (
             <polygon

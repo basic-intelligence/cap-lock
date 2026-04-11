@@ -4,6 +4,7 @@ import { useReducer, useCallback, useEffect } from "react";
 import { evaluateGuess, type LetterFeedback } from "@/app/lib/game-logic";
 import { type WordEntry } from "@/app/lib/words";
 import { type DisplayState } from "./SegmentDisplay";
+import { CHAR_MAP, isSegmentOn, SEGMENT_COUNT } from "@/app/lib/segments";
 import { useRevealSchedule } from "@/app/hooks/useRevealSchedule";
 import { useCountdown } from "@/app/hooks/useCountdown";
 import WordDisplay from "./WordDisplay";
@@ -159,15 +160,48 @@ export default function Game({ words }: GameProps) {
     }
   }, [state.phase, revealAll]);
 
-  // Build locked-letters array from guesses
+  // Check which character positions are fully revealed by the drip
+  // (all active segments for that character have been revealed)
+  const fullyRevealedPositions: boolean[] = state.targetWord
+    .split("")
+    .map((char, ci) => {
+      const code = CHAR_MAP[char.toUpperCase()];
+      if (!code) return false;
+      for (let si = 0; si < SEGMENT_COUNT; si++) {
+        if (isSegmentOn(code, si) && !(revealed[ci]?.[si])) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+  // Collect unique letters that are fully revealed by drip (for alphabet strip)
+  const fullyRevealedLetters = new Set<string>();
+  state.targetWord.split("").forEach((char, i) => {
+    if (fullyRevealedPositions[i]) {
+      fullyRevealedLetters.add(char.toUpperCase());
+    }
+  });
+  // Also include letters confirmed by guesses
+  for (const guess of state.guesses) {
+    guess.feedback.forEach((fb, i) => {
+      if (fb === "correct") {
+        fullyRevealedLetters.add(guess.word[i]);
+      }
+    });
+  }
+
+  // Build locked-letters array: green if guessed correct OR fully revealed by drip
   const lockedLetters: DisplayState[] = state.targetWord
     .split("")
     .map((char, i) => {
-      // Check if any guess has a 'correct' at this position
       for (const guess of state.guesses) {
         if (guess.feedback[i] === "correct") {
           return "green" as DisplayState;
         }
+      }
+      if (fullyRevealedPositions[i]) {
+        return "green" as DisplayState;
       }
       return "dim" as DisplayState;
     });
@@ -203,9 +237,6 @@ export default function Game({ words }: GameProps) {
         maxHeight: "100dvh",
       }}
     >
-      {/* Alphabet strip */}
-      <AlphabetStrip />
-
       {/* Theme hint */}
       <div
         style={{
@@ -239,6 +270,9 @@ export default function Game({ words }: GameProps) {
         error={state.error}
         onClearError={handleClearError}
       />
+
+      {/* Alphabet reference */}
+      <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
 
       {/* Guess history */}
       <GuessHistory guesses={state.guesses} />
