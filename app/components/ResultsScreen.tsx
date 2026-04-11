@@ -55,7 +55,7 @@ export default function ResultsScreen({
             margin: 0,
           }}
         >
-          {isWin ? "SOLVED!" : "TIME'S UP"}
+          {isWin ? "SOLVED!" : "NO MORE GUESSES"}
         </h2>
 
         <div
