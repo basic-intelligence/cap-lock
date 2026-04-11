@@ -1,0 +1,126 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --panel-bg: #111111;
+  --panel-border: #222222;
+  --amber: #ff9500;
+  --amber-dim: #2a1a0a;
+  --green: #00e676;
+  --yellow: #ffb300;
+  --gray: #4a4a4a;
+  --text: #cccccc;
+  --text-muted: #777777;
+  --danger: #ff3333;
+}
+
+html {
+  color-scheme: dark;
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono), "Courier New", monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-6px); }
+  20% { transform: translateX(6px); }
+  30% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  50% { transform: translateX(-4px); }
+  60% { transform: translateX(0); }
+}
+
+.shake {
+  animation: shake 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Retro panel container */
+.display-panel {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 24px 16px;
+  box-shadow:
+    0 0 20px rgba(255, 149, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Scanline overlay */
+.display-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: repeating-linear-gradient(
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  pointer-events: none;
+}
+
+/* Subtle flicker per character */
+@keyframes flicker-a { 0%, 93%, 94%, 96%, 97%, 100% { opacity: 1; } 93.5% { opacity: 0.92; } 96.5% { opacity: 0.95; } }
+@keyframes flicker-b { 0%, 91%, 92%, 95%, 96%, 100% { opacity: 1; } 91.5% { opacity: 0.93; } 95.5% { opacity: 0.94; } }
+@keyframes flicker-c { 0%, 94%, 95%, 97%, 98%, 100% { opacity: 1; } 94.5% { opacity: 0.91; } 97.5% { opacity: 0.95; } }
+
+.segment-char:nth-child(7n+1) { animation: flicker-a 7s infinite; }
+.segment-char:nth-child(7n+2) { animation: flicker-b 11s infinite; }
+.segment-char:nth-child(7n+3) { animation: flicker-c 13s infinite; }
+.segment-char:nth-child(7n+4) { animation: flicker-a 17s infinite; }
+.segment-char:nth-child(7n+5) { animation: flicker-b 19s infinite; }
+.segment-char:nth-child(7n+6) { animation: flicker-c 9s infinite; }
+.segment-char:nth-child(7n)   { animation: flicker-a 15s infinite; }
+
+/* Green pulse for victory */
+@keyframes green-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(0, 230, 118, 0.4)); }
+  50% { filter: drop-shadow(0 0 20px rgba(0, 230, 118, 0.7)); }
+}
+
+.victory-pulse {
+  animation: green-pulse 0.8s ease-in-out 2;
+}
+
+/* Cascade reveal for time-up */
+@keyframes cascade-reveal {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+
+/* Accessibility: reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .segment-char { animation: none !important; }
+  .victory-pulse { animation: none !important; }
+  .shake { animation: none !important; }
+  * { transition-duration: 0.01ms !important; }
+}
