@@ -220,6 +220,7 @@ export default function Game({ words }: GameProps) {
           word={state.targetWord}
           revealedSegments={revealed}
           lockedLetters={lockedLetters}
+          isVictory={state.phase === "won"}
         />
       </div>
 
