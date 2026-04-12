@@ -16,7 +16,7 @@ interface SegmentDisplayProps {
 const COLORS = {
   amber: "#ff9500",
   green: "#00e676",
-  dim: "#2a1a0a",
+  dim: "#3a3a3a",
 };
 
 export default function SegmentDisplay({
@@ -72,7 +72,7 @@ export default function SegmentDisplay({
             ? (isActive ? COLORS.green : COLORS.dim)
             : (isLit ? COLORS.amber : COLORS.dim);
 
-          const opacity = isLit ? 1 : showOutlines ? 0.18 : 0.08;
+          const opacity = isLit ? 1 : showOutlines ? 0.25 : 0.15;
 
           return (
             <polygon
