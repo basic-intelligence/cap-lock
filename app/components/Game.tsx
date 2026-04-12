@@ -1,20 +1,17 @@
 "use client";
 
-import { useReducer, useCallback, useEffect } from "react";
-import { evaluateGuess, type LetterFeedback } from "@/app/lib/game-logic";
+import { useReducer, useCallback, useEffect, useMemo } from "react";
+import { evaluateGuess, computeSegmentOverlap, type LetterFeedback } from "@/app/lib/game-logic";
 import { type WordEntry } from "@/app/lib/words";
 import { type DisplayState } from "./SegmentDisplay";
 import { CHAR_MAP, isSegmentOn, SEGMENT_COUNT } from "@/app/lib/segments";
-import { useRevealSchedule } from "@/app/hooks/useRevealSchedule";
-import { useCountdown } from "@/app/hooks/useCountdown";
 import WordDisplay from "./WordDisplay";
 import GuessInput from "./GuessInput";
 import GuessHistory from "./GuessHistory";
-import Timer from "./Timer";
 import ResultsScreen from "./ResultsScreen";
 import AlphabetStrip from "./AlphabetStrip";
 
-const ROUND_DURATION_MS = 60_000;
+const MAX_GUESSES = 4;
 
 // --- State types ---
 
@@ -30,15 +27,12 @@ export interface GameState {
   targetWord: string;
   theme: string;
   guesses: GuessRecord[];
-  startTime: number;
-  solveTime: number | null;
   error: string | null;
 }
 
 export type GameAction =
   | { type: "START_ROUND"; word: string; theme: string }
   | { type: "SUBMIT_GUESS"; guess: string }
-  | { type: "TIME_UP" }
   | { type: "PLAY_AGAIN"; word: string; theme: string }
   | { type: "CLEAR_ERROR" };
 
@@ -47,8 +41,6 @@ const initialState: GameState = {
   targetWord: "",
   theme: "",
   guesses: [],
-  startTime: 0,
-  solveTime: null,
   error: null,
 };
 
@@ -60,7 +52,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: "playing",
         targetWord: action.word.toUpperCase(),
         theme: action.theme,
-        startTime: Date.now(),
       };
 
     case "SUBMIT_GUESS": {
@@ -76,20 +67,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       const feedback = evaluateGuess(guess, state.targetWord);
       const isCorrect = guess === state.targetWord;
-      const newGuess: GuessRecord = { word: guess, feedback };
+      const newGuesses = [{ word: guess, feedback }, ...state.guesses];
+      const outOfGuesses = newGuesses.length >= MAX_GUESSES && !isCorrect;
 
       return {
         ...state,
-        guesses: [newGuess, ...state.guesses],
-        phase: isCorrect ? "won" : state.phase,
-        solveTime: isCorrect ? Date.now() - state.startTime : state.solveTime,
+        guesses: newGuesses,
+        phase: isCorrect ? "won" : outOfGuesses ? "lost" : state.phase,
         error: null,
       };
     }
-
-    case "TIME_UP":
-      if (state.phase !== "playing") return state;
-      return { ...state, phase: "lost" };
 
     case "PLAY_AGAIN":
       return {
@@ -97,7 +84,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: "playing",
         targetWord: action.word.toUpperCase(),
         theme: action.theme,
-        startTime: Date.now(),
       };
 
     case "CLEAR_ERROR":
@@ -135,66 +121,72 @@ export default function Game({ words }: GameProps) {
 
   const isPlaying = state.phase === "playing";
 
-  // Timer
-  const handleExpire = useCallback(() => {
-    dispatch({ type: "TIME_UP" });
-  }, []);
+  // Accumulate revealed segments from all guesses.
+  // For each position, the union of segment overlaps across every guess.
+  const revealed: boolean[][] = useMemo(() => {
+    const acc: boolean[][] = Array.from({ length: state.targetWord.length }, () =>
+      new Array(SEGMENT_COUNT).fill(false)
+    );
 
-  const { remaining } = useCountdown({
-    durationMs: ROUND_DURATION_MS,
-    onExpire: handleExpire,
-    running: isPlaying,
-  });
-
-  // Reveal schedule
-  const { revealed, revealAll } = useRevealSchedule({
-    word: state.targetWord || "A",
-    durationMs: ROUND_DURATION_MS,
-    running: isPlaying,
-  });
-
-  // Reveal all segments when round ends
-  useEffect(() => {
-    if (state.phase === "won" || state.phase === "lost") {
-      revealAll();
+    // Walk guesses oldest-first (they're stored newest-first)
+    for (let gi = state.guesses.length - 1; gi >= 0; gi--) {
+      const guess = state.guesses[gi];
+      const overlap = computeSegmentOverlap(guess.word, state.targetWord);
+      for (let ci = 0; ci < overlap.length; ci++) {
+        for (let si = 0; si < SEGMENT_COUNT; si++) {
+          if (overlap[ci][si]) acc[ci][si] = true;
+        }
+      }
+      // If letter was exactly correct, reveal ALL segments for that position
+      for (let ci = 0; ci < guess.feedback.length; ci++) {
+        if (guess.feedback[ci] === "correct") {
+          const code = CHAR_MAP[state.targetWord[ci]?.toUpperCase()] ?? 0;
+          for (let si = 0; si < SEGMENT_COUNT; si++) {
+            if (isSegmentOn(code, si)) acc[ci][si] = true;
+          }
+        }
+      }
     }
-  }, [state.phase, revealAll]);
 
-  // Check which character positions are fully revealed by the drip
-  // (all active segments for that character have been revealed)
+    // If game is over (lost), reveal everything
+    if (state.phase === "lost") {
+      for (let ci = 0; ci < state.targetWord.length; ci++) {
+        const code = CHAR_MAP[state.targetWord[ci]?.toUpperCase()] ?? 0;
+        for (let si = 0; si < SEGMENT_COUNT; si++) {
+          if (isSegmentOn(code, si)) acc[ci][si] = true;
+        }
+      }
+    }
+
+    return acc;
+  }, [state.guesses, state.targetWord, state.phase]);
+
+  // Check which positions are fully revealed
   const fullyRevealedPositions: boolean[] = state.targetWord
     .split("")
     .map((char, ci) => {
       const code = CHAR_MAP[char.toUpperCase()];
       if (!code) return false;
       for (let si = 0; si < SEGMENT_COUNT; si++) {
-        if (isSegmentOn(code, si) && !(revealed[ci]?.[si])) {
+        if (isSegmentOn(code, si) && !revealed[ci]?.[si]) {
           return false;
         }
       }
       return true;
     });
 
-  // Collect unique letters that are fully revealed by drip (for alphabet strip)
+  // Collect letters that are fully revealed (for alphabet strip)
   const fullyRevealedLetters = new Set<string>();
   state.targetWord.split("").forEach((char, i) => {
     if (fullyRevealedPositions[i]) {
       fullyRevealedLetters.add(char.toUpperCase());
     }
   });
-  // Also include letters confirmed by guesses
-  for (const guess of state.guesses) {
-    guess.feedback.forEach((fb, i) => {
-      if (fb === "correct") {
-        fullyRevealedLetters.add(guess.word[i]);
-      }
-    });
-  }
 
-  // Build locked-letters array: green if guessed correct OR fully revealed by drip
+  // Build locked-letters: green if exact match guessed OR all segments revealed
   const lockedLetters: DisplayState[] = state.targetWord
     .split("")
-    .map((char, i) => {
+    .map((_char, i) => {
       for (const guess of state.guesses) {
         if (guess.feedback[i] === "correct") {
           return "green" as DisplayState;
@@ -206,12 +198,9 @@ export default function Game({ words }: GameProps) {
       return "dim" as DisplayState;
     });
 
-  const handleGuess = useCallback(
-    (guess: string) => {
-      dispatch({ type: "SUBMIT_GUESS", guess });
-    },
-    []
-  );
+  const handleGuess = useCallback((guess: string) => {
+    dispatch({ type: "SUBMIT_GUESS", guess });
+  }, []);
 
   const handleClearError = useCallback(() => {
     dispatch({ type: "CLEAR_ERROR" });
@@ -223,6 +212,8 @@ export default function Game({ words }: GameProps) {
   }, [words, state.targetWord]);
 
   if (!state.targetWord) return null;
+
+  const guessesRemaining = MAX_GUESSES - state.guesses.length;
 
   return (
     <main
@@ -237,18 +228,6 @@ export default function Game({ words }: GameProps) {
         maxHeight: "100dvh",
       }}
     >
-      {/* Theme hint */}
-      <div
-        style={{
-          fontSize: "1.8rem",
-          letterSpacing: "0.15em",
-          textTransform: "uppercase",
-          color: "var(--amber)",
-          fontWeight: "bold",
-        }}
-      >
-        &ldquo;{state.theme}&rdquo;
-      </div>
 
       {/* Word display + alphabet grouped tight */}
       <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "120px", gap: 0 }}>
@@ -258,20 +237,30 @@ export default function Game({ words }: GameProps) {
           lockedLetters={lockedLetters}
           isVictory={state.phase === "won"}
         />
-        <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
+        <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} revealedSegments={revealed} />
       </div>
 
-      {/* Timer */}
-      {isPlaying && <Timer remainingMs={remaining} />}
-
-      {/* Input */}
-      <GuessInput
+      {/* Guess counter + Input grouped tight */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", width: "100%" }}>
+        {isPlaying && (
+          <div
+            style={{
+              fontSize: "1rem",
+              color: guessesRemaining <= 1 ? "var(--danger)" : "var(--text-muted)",
+              letterSpacing: "0.1em",
+            }}
+          >
+            {guessesRemaining} {guessesRemaining === 1 ? "guess" : "guesses"} remaining
+          </div>
+        )}
+        <GuessInput
         targetLength={state.targetWord.length}
         onSubmit={handleGuess}
         disabled={!isPlaying}
         error={state.error}
         onClearError={handleClearError}
       />
+      </div>
 
       {/* Guess history */}
       <GuessHistory guesses={state.guesses} />
@@ -280,7 +269,7 @@ export default function Game({ words }: GameProps) {
       <ResultsScreen
         phase={state.phase}
         targetWord={state.targetWord}
-        solveTime={state.solveTime}
+        solveTime={null}
         guessCount={state.guesses.length}
         onPlayAgain={handlePlayAgain}
       />

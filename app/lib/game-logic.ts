@@ -1,3 +1,5 @@
+import { CHAR_MAP, SEGMENT_COUNT, isSegmentOn } from "./segments";
+
 export type LetterFeedback = "correct" | "present" | "absent";
 
 /**
@@ -37,4 +39,31 @@ export function evaluateGuess(
   }
 
   return result;
+}
+
+/**
+ * For each position, compute which segments the guessed letter shares with the target letter.
+ * Returns a 2D boolean array [charIndex][segmentIndex] of newly revealed segments.
+ */
+export function computeSegmentOverlap(
+  guess: string,
+  target: string
+): boolean[][] {
+  const g = guess.toUpperCase();
+  const t = target.toUpperCase();
+
+  return t.split("").map((targetChar, i) => {
+    const guessChar = g[i];
+    if (!guessChar) return new Array(SEGMENT_COUNT).fill(false);
+
+    const targetCode = CHAR_MAP[targetChar] ?? 0;
+    const guessCode = CHAR_MAP[guessChar] ?? 0;
+
+    // Intersection: segments that are active in BOTH the guessed and target character
+    const overlap = new Array(SEGMENT_COUNT).fill(false);
+    for (let s = 0; s < SEGMENT_COUNT; s++) {
+      overlap[s] = isSegmentOn(targetCode, s) && isSegmentOn(guessCode, s);
+    }
+    return overlap;
+  });
 }

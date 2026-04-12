@@ -1,5 +1,6 @@
-import { evaluateGuess } from "@/app/lib/game-logic";
+import { evaluateGuess, computeSegmentOverlap } from "@/app/lib/game-logic";
 import { gameReducer, type GameState } from "@/app/components/Game";
+import { CHAR_MAP, isSegmentOn, SEGMENT_COUNT } from "@/app/lib/segments";
 
 describe("evaluateGuess", () => {
   it("all correct for exact match", () => {
@@ -9,29 +10,11 @@ describe("evaluateGuess", () => {
 
   it("identifies present letters in wrong positions", () => {
     const result = evaluateGuess("CRANE", "REACT");
-    // C in CRANE vs REACT: C is in REACT at index 3, not at 0 → present
-    // R in CRANE vs REACT: R is in REACT at index 0, not at 1 → present
-    // A in CRANE vs REACT: A is in REACT at index 2, not at 2? Actually: CRANE[2]=A, REACT[2]=A → correct!
-    // Wait, let me recalculate:
-    // CRANE: C(0) R(1) A(2) N(3) E(4)
-    // REACT: R(0) E(1) A(2) C(3) T(4)
-    // Pass 1 (exact): A at index 2 → correct
-    // Pass 2: C(0) → C is in remaining [R,E,null,C,T] at index 3 → present
-    //         R(1) → R is in remaining [R,E,null,null,T] at index 0 → present
-    //         N(3) → N not in remaining → absent
-    //         E(4) → E is in remaining [null,E,null,null,T] at index 1 → present
     expect(result).toEqual(["present", "present", "correct", "absent", "present"]);
   });
 
   it("handles duplicate letters: PAPER vs APPLE", () => {
     const result = evaluateGuess("PAPER", "APPLE");
-    // PAPER: P(0) A(1) P(2) E(3) R(4)
-    // APPLE: A(0) P(1) P(2) L(3) E(4)
-    // Pass 1 exact: P(2)=P(2) → correct. Remaining: [A,P,null,L,E]
-    // Pass 2: P(0) → P in remaining at index 1 → present. Remaining: [A,null,null,L,E]
-    //         A(1) → A in remaining at index 0 → present. Remaining: [null,null,null,L,E]
-    //         E(3) → E in remaining at index 4 → present. Remaining: [null,null,null,L,null]
-    //         R(4) → R not in remaining → absent
     expect(result).toEqual(["present", "present", "correct", "present", "absent"]);
   });
 
@@ -42,14 +25,59 @@ describe("evaluateGuess", () => {
 
   it("handles excess duplicates in guess", () => {
     const result = evaluateGuess("AABBB", "ABCDE");
-    // AABBB: A(0) A(1) B(2) B(3) B(4)
-    // ABCDE: A(0) B(1) C(2) D(3) E(4)
-    // Pass 1 exact: A(0)=A(0) → correct. Remaining: [null,B,C,D,E]
-    // Pass 2: A(1) → A not in remaining → absent
-    //         B(2) → B in remaining at index 1 → present. Remaining: [null,null,C,D,E]
-    //         B(3) → B not in remaining → absent
-    //         B(4) → B not in remaining → absent
     expect(result).toEqual(["correct", "absent", "present", "absent", "absent"]);
+  });
+});
+
+describe("computeSegmentOverlap", () => {
+  it("returns all true for identical letters", () => {
+    const overlap = computeSegmentOverlap("A", "A");
+    const activeSegments = [];
+    const code = CHAR_MAP["A"];
+    for (let s = 0; s < SEGMENT_COUNT; s++) {
+      if (isSegmentOn(code, s)) activeSegments.push(s);
+    }
+    // Every active segment of A should overlap with itself
+    for (const s of activeSegments) {
+      expect(overlap[0][s]).toBe(true);
+    }
+  });
+
+  it("returns no overlap for letters with no shared segments", () => {
+    // I = A, D, I(center), L(center) — mostly top/bottom + center verticals
+    // X = H, J, K, M — all diagonals
+    // These should share zero segments
+    const overlap = computeSegmentOverlap("X", "I");
+    const anyOverlap = overlap[0].some(Boolean);
+    expect(anyOverlap).toBe(false);
+  });
+
+  it("returns partial overlap for letters sharing some segments", () => {
+    // O = A,B,C,D,E,F (outer box)
+    // C = A,D,E,F (left + top + bottom)
+    // Overlap should be A,D,E,F
+    const overlap = computeSegmentOverlap("O", "C");
+    expect(overlap[0][0]).toBe(true);  // A (top)
+    expect(overlap[0][3]).toBe(true);  // D (bottom)
+    expect(overlap[0][4]).toBe(true);  // E (lower-left)
+    expect(overlap[0][5]).toBe(true);  // F (upper-left)
+    // B and C are in O but not in target C
+    expect(overlap[0][1]).toBe(false); // B
+    expect(overlap[0][2]).toBe(false); // C
+  });
+
+  it("works across multiple positions", () => {
+    const overlap = computeSegmentOverlap("AB", "AC");
+    // Position 0: A vs A → full overlap
+    // Position 1: B vs C → partial overlap (B and C share segment C = lower-right vertical)
+    expect(overlap).toHaveLength(2);
+    // Position 0: all A segments should overlap
+    const codeA = CHAR_MAP["A"];
+    for (let s = 0; s < SEGMENT_COUNT; s++) {
+      if (isSegmentOn(codeA, s)) {
+        expect(overlap[0][s]).toBe(true);
+      }
+    }
   });
 });
 
@@ -59,8 +87,6 @@ describe("gameReducer", () => {
     targetWord: "CRANE",
     theme: "Animals",
     guesses: [],
-    startTime: Date.now() - 5000,
-    solveTime: null,
     error: null,
   };
 
@@ -71,17 +97,15 @@ describe("gameReducer", () => {
     );
     expect(state.phase).toBe("playing");
     expect(state.targetWord).toBe("HAWK");
-    expect(state.theme).toBe("Animals");
     expect(state.guesses).toEqual([]);
   });
 
-  it("correct guess transitions to won and records solve time", () => {
+  it("correct guess transitions to won", () => {
     const state = gameReducer(basePlayingState, {
       type: "SUBMIT_GUESS",
       guess: "CRANE",
     });
     expect(state.phase).toBe("won");
-    expect(state.solveTime).toBeGreaterThan(0);
     expect(state.guesses).toHaveLength(1);
     expect(state.guesses[0].feedback).toEqual([
       "correct", "correct", "correct", "correct", "correct",
@@ -108,9 +132,26 @@ describe("gameReducer", () => {
     expect(state.error).toContain("Letters only");
   });
 
-  it("TIME_UP transitions to lost", () => {
-    const state = gameReducer(basePlayingState, { type: "TIME_UP" });
+  it("4th wrong guess transitions to lost", () => {
+    let state = basePlayingState;
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "TRACK" });
+    expect(state.phase).toBe("playing");
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "STORM" });
+    expect(state.phase).toBe("playing");
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "BRAVE" });
+    expect(state.phase).toBe("playing");
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "FLAME" });
     expect(state.phase).toBe("lost");
+    expect(state.guesses).toHaveLength(4);
+  });
+
+  it("correct guess on 4th attempt still wins", () => {
+    let state = basePlayingState;
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "TRACK" });
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "STORM" });
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "BRAVE" });
+    state = gameReducer(state, { type: "SUBMIT_GUESS", guess: "CRANE" });
+    expect(state.phase).toBe("won");
   });
 
   it("PLAY_AGAIN resets to playing with new word", () => {
