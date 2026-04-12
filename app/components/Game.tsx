@@ -228,18 +228,6 @@ export default function Game({ words }: GameProps) {
         maxHeight: "100dvh",
       }}
     >
-      {/* Theme hint */}
-      <div
-        style={{
-          fontSize: "1.8rem",
-          letterSpacing: "0.15em",
-          textTransform: "uppercase",
-          color: "var(--amber)",
-          fontWeight: "bold",
-        }}
-      >
-        &ldquo;{state.theme}&rdquo;
-      </div>
 
       {/* Word display + alphabet grouped tight */}
       <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "120px", gap: 0 }}>
