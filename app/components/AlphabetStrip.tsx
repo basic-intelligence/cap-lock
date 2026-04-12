@@ -60,14 +60,14 @@ export default function AlphabetStrip({ fullyRevealedLetters, revealedSegments }
           <div
             key={ch}
             style={{
-              opacity: state === "dim" ? 0.2 : 1,
+              opacity: state === "dim" ? 0.3 : 1,
               transition: "opacity 0.4s ease",
             }}
           >
             <SegmentDisplay
               char={ch}
               revealedSegments={ALL_REVEALED}
-              displayState={state === "green" ? "green" : "amber"}
+              displayState={state}
               size={14}
               showOutlines
             />
