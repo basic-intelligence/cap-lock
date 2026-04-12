@@ -18,7 +18,7 @@ export default function AlphabetStrip({ fullyRevealedLetters }: AlphabetStripPro
         display: "flex",
         justifyContent: "space-between",
         width: "100%",
-        padding: "8px 0 16px",
+        padding: "8px 0 24px",
       }}
     >
       {ALPHABET.split("").map((ch) => (

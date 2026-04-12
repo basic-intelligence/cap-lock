@@ -252,27 +252,27 @@ export default function Game({ words }: GameProps) {
         <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
       </div>
 
-      {/* Guess counter */}
-      {isPlaying && (
-        <div
-          style={{
-            fontSize: "1rem",
-            color: guessesRemaining <= 1 ? "var(--danger)" : "var(--text-muted)",
-            letterSpacing: "0.1em",
-          }}
-        >
-          {guessesRemaining} {guessesRemaining === 1 ? "guess" : "guesses"} remaining
-        </div>
-      )}
-
-      {/* Input */}
-      <GuessInput
+      {/* Guess counter + Input grouped tight */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", width: "100%" }}>
+        {isPlaying && (
+          <div
+            style={{
+              fontSize: "1rem",
+              color: guessesRemaining <= 1 ? "var(--danger)" : "var(--text-muted)",
+              letterSpacing: "0.1em",
+            }}
+          >
+            {guessesRemaining} {guessesRemaining === 1 ? "guess" : "guesses"} remaining
+          </div>
+        )}
+        <GuessInput
         targetLength={state.targetWord.length}
         onSubmit={handleGuess}
         disabled={!isPlaying}
         error={state.error}
         onClearError={handleClearError}
       />
+      </div>
 
       {/* Guess history */}
       <GuessHistory guesses={state.guesses} />
