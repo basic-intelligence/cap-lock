@@ -249,7 +249,7 @@ export default function Game({ words }: GameProps) {
           lockedLetters={lockedLetters}
           isVictory={state.phase === "won"}
         />
-        <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} />
+        <AlphabetStrip fullyRevealedLetters={fullyRevealedLetters} revealedSegments={revealed} />
       </div>
 
       {/* Guess counter + Input grouped tight */}
