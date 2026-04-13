@@ -1,6 +1,7 @@
 "use client";
 
 import type { GamePhase } from "./Game";
+import type { PlayerStats } from "@/app/lib/stats";
 
 interface ResultsScreenProps {
   phase: GamePhase;
@@ -8,6 +9,81 @@ interface ResultsScreenProps {
   solveTime: number | null;
   guessCount: number;
   onPlayAgain: () => void;
+  stats: PlayerStats | null;
+}
+
+function StatBox({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div style={{ textAlign: "center", minWidth: "48px" }}>
+      <div style={{ fontSize: "1.4rem", color: "var(--text)", fontWeight: "bold" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", letterSpacing: "0.05em" }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function GuessDistribution({
+  distribution,
+  currentGuesses,
+  isWin,
+}: {
+  distribution: Record<number, number>;
+  currentGuesses: number;
+  isWin: boolean;
+}) {
+  const maxCount = Math.max(1, ...Object.values(distribution));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
+      {[1, 2, 3, 4].map((n) => {
+        const count = distribution[n] ?? 0;
+        const widthPct = Math.max(8, (count / maxCount) * 100);
+        const isCurrentGuess = isWin && n === currentGuesses;
+
+        return (
+          <div key={n} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div
+              style={{
+                width: "12px",
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                textAlign: "right",
+                flexShrink: 0,
+              }}
+            >
+              {n}
+            </div>
+            <div
+              style={{
+                height: "20px",
+                width: `${widthPct}%`,
+                background: isCurrentGuess ? "var(--green)" : "var(--amber)",
+                borderRadius: "3px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                padding: "0 6px",
+                transition: "width 0.4s ease",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  fontWeight: "bold",
+                  color: "#000",
+                }}
+              >
+                {count}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ResultsScreen({
@@ -16,10 +92,14 @@ export default function ResultsScreen({
   solveTime,
   guessCount,
   onPlayAgain,
+  stats,
 }: ResultsScreenProps) {
   if (phase !== "won" && phase !== "lost") return null;
 
   const isWin = phase === "won";
+  const winPct = stats && stats.gamesPlayed > 0
+    ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
+    : 0;
 
   return (
     <div
@@ -69,30 +149,45 @@ export default function ResultsScreen({
           {targetWord}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "24px",
-            color: "var(--text-muted)",
-            fontSize: "0.9rem",
-          }}
-        >
-          {isWin && solveTime !== null && (
-            <div>
-              <div style={{ fontSize: "1.4rem", color: "var(--text)" }}>
-                {(solveTime / 1000).toFixed(1)}s
-              </div>
-              <div>solve time</div>
-            </div>
-          )}
-          <div>
-            <div style={{ fontSize: "1.4rem", color: "var(--text)" }}>
-              {guessCount}
-            </div>
-            <div>{guessCount === 1 ? "guess" : "guesses"}</div>
+        {/* Stats row */}
+        {stats && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-around",
+              padding: "8px 0",
+              borderTop: "1px solid var(--panel-border)",
+              borderBottom: "1px solid var(--panel-border)",
+            }}
+          >
+            <StatBox value={stats.gamesPlayed} label="Played" />
+            <StatBox value={winPct} label="Win %" />
+            <StatBox value={stats.currentStreak} label="Streak" />
+            <StatBox value={stats.maxStreak} label="Max" />
           </div>
-        </div>
+        )}
+
+        {/* Guess distribution */}
+        {stats && (
+          <div>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-muted)",
+                letterSpacing: "0.1em",
+                marginBottom: "8px",
+                textTransform: "uppercase",
+              }}
+            >
+              Guess Distribution
+            </div>
+            <GuessDistribution
+              distribution={stats.guessDistribution}
+              currentGuesses={guessCount}
+              isWin={isWin}
+            />
+          </div>
+        )}
 
         <button
           onClick={onPlayAgain}

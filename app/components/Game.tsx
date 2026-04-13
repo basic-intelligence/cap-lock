@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useEffect, useMemo } from "react";
+import { useReducer, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { evaluateGuess, computeSegmentOverlap, type LetterFeedback } from "@/app/lib/game-logic";
 import { type WordEntry } from "@/app/lib/words";
 import { type DisplayState } from "./SegmentDisplay";
@@ -10,6 +10,7 @@ import GuessInput from "./GuessInput";
 import GuessHistory from "./GuessHistory";
 import ResultsScreen from "./ResultsScreen";
 import AlphabetStrip from "./AlphabetStrip";
+import { recordGame, getStats, type PlayerStats } from "@/app/lib/stats";
 
 const MAX_GUESSES = 4;
 
@@ -110,6 +111,12 @@ interface GameProps {
 
 export default function Game({ words }: GameProps) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
+  const [stats, setStats] = useState<PlayerStats | null>(null);
+
+  // Load stats on mount
+  useEffect(() => {
+    setStats(getStats());
+  }, []);
 
   // Start first round on mount
   useEffect(() => {
@@ -118,6 +125,28 @@ export default function Game({ words }: GameProps) {
       dispatch({ type: "START_ROUND", word: entry.word, theme: entry.theme });
     }
   }, [state.phase, words]);
+
+  // Record stats when game ends (guarded against StrictMode double-fire)
+  const recordedPhaseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      (state.phase === "won" || state.phase === "lost") &&
+      recordedPhaseRef.current !== state.phase
+    ) {
+      recordedPhaseRef.current = state.phase;
+      const updated = recordGame({
+        word: state.targetWord,
+        theme: state.theme,
+        guesses: state.guesses.length,
+        won: state.phase === "won",
+        timestamp: Date.now(),
+      });
+      setStats(updated);
+    }
+    if (state.phase === "playing") {
+      recordedPhaseRef.current = null;
+    }
+  }, [state.phase, state.targetWord, state.theme, state.guesses.length]);
 
   const isPlaying = state.phase === "playing";
 
@@ -272,6 +301,7 @@ export default function Game({ words }: GameProps) {
         solveTime={null}
         guessCount={state.guesses.length}
         onPlayAgain={handlePlayAgain}
+        stats={stats}
       />
     </main>
   );
