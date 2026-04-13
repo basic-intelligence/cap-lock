@@ -1,4 +1,5 @@
-const STORAGE_KEY = "cap-locks-stats";
+const STORAGE_KEY = "cap-lock-stats";
+const MAX_HISTORY = 200;
 
 export interface GameRecord {
   word: string;
@@ -17,32 +18,35 @@ export interface PlayerStats {
   gameHistory: GameRecord[];
 }
 
-const DEFAULT_STATS: PlayerStats = {
-  gamesPlayed: 0,
-  gamesWon: 0,
-  currentStreak: 0,
-  maxStreak: 0,
-  guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0 },
-  gameHistory: [],
-};
+/** Factory — returns a fresh stats object every call to avoid shared-reference mutation. */
+function emptyStats(): PlayerStats {
+  return {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    currentStreak: 0,
+    maxStreak: 0,
+    guessDistribution: {},
+    gameHistory: [],
+  };
+}
 
 export function getStats(): PlayerStats {
-  if (typeof window === "undefined") return { ...DEFAULT_STATS };
+  if (typeof window === "undefined") return emptyStats();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATS };
+    if (!raw) return emptyStats();
     const parsed = JSON.parse(raw);
-    // Merge with defaults to handle missing fields from older versions
+    const defaults = emptyStats();
     return {
-      ...DEFAULT_STATS,
+      ...defaults,
       ...parsed,
       guessDistribution: {
-        ...DEFAULT_STATS.guessDistribution,
         ...parsed.guessDistribution,
       },
+      gameHistory: [...(parsed.gameHistory ?? [])],
     };
   } catch {
-    return { ...DEFAULT_STATS };
+    return emptyStats();
   }
 }
 
@@ -61,6 +65,7 @@ export function recordGame(result: GameRecord): PlayerStats {
   }
 
   stats.gameHistory.push(result);
+  stats.gameHistory = stats.gameHistory.slice(-MAX_HISTORY);
 
   if (typeof window !== "undefined") {
     try {

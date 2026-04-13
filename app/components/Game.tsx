@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
+import { useReducer, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { evaluateGuess, computeSegmentOverlap, type LetterFeedback } from "@/app/lib/game-logic";
 import { type WordEntry } from "@/app/lib/words";
 import { type DisplayState } from "./SegmentDisplay";
@@ -126,9 +126,14 @@ export default function Game({ words }: GameProps) {
     }
   }, [state.phase, words]);
 
-  // Record stats when game ends
+  // Record stats when game ends (guarded against StrictMode double-fire)
+  const recordedPhaseRef = useRef<string | null>(null);
   useEffect(() => {
-    if (state.phase === "won" || state.phase === "lost") {
+    if (
+      (state.phase === "won" || state.phase === "lost") &&
+      recordedPhaseRef.current !== state.phase
+    ) {
+      recordedPhaseRef.current = state.phase;
       const updated = recordGame({
         word: state.targetWord,
         theme: state.theme,
@@ -138,7 +143,10 @@ export default function Game({ words }: GameProps) {
       });
       setStats(updated);
     }
-  }, [state.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (state.phase === "playing") {
+      recordedPhaseRef.current = null;
+    }
+  }, [state.phase, state.targetWord, state.theme, state.guesses.length]);
 
   const isPlaying = state.phase === "playing";
 
